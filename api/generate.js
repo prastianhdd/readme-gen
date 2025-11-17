@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 // Helper (masih sama)
 function parseRepoUrl(url) {
   try {
@@ -10,7 +12,7 @@ function parseRepoUrl(url) {
   }
 }
 
-// Helper (masih sama, versi 2)
+// Helper (masih sama)
 function analyzePackageJson(pkgJson) {
   const scripts = pkgJson.scripts || {};
   let installCmd = 'npm install';
@@ -30,7 +32,49 @@ function analyzePackageJson(pkgJson) {
   return { installCmd, usageCmd };
 }
 
-// --- Handler Utama Serverless Function (Versi 3) ---
+// --- FUNGSI BARU UNTUK MEMANGGIL AI ---
+async function analyzeCodeWithAI(codeContent) {
+  try {
+    // 1. Inisialisasi AI dengan Kunci API dari Environment Variables
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+    // 2. Prompt Engineering: Instruksi untuk AI
+    const prompt = `
+      Anda adalah seorang penulis teknis ahli yang bertugas menganalisis kode sumber.
+      Tugas Anda adalah menghasilkan deskripsi proyek dan daftar fitur utama.
+      
+      Aturan:
+      1. Balas HANYA dengan objek JSON yang valid.
+      2. Objek JSON harus memiliki dua kunci: "description" (string) dan "features" (array string).
+      3. "description" harus berupa deskripsi proyek 1-2 kalimat yang ringkas dan menarik.
+      4. "features" harus berupa array berisi 3-5 string, di mana setiap string adalah fitur utama yang terdeteksi dari kode.
+      5. Jangan sertakan markdown \`\`\`json atau teks lain di luar objek JSON.
+
+      Berikut adalah kode sumbernya:
+      --- KODE MULAI ---
+      ${codeContent}
+      --- KODE SELESAI ---
+    `;
+
+    // 3. Hasilkan konten
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // 4. Parsing respons JSON dari AI
+    // Membersihkan jika AI secara tidak sengaja membungkusnya dalam markdown
+    const jsonString = text.replace(/^```json\n/, '').replace(/\n```$/, '');
+    return JSON.parse(jsonString); // Mengembalikan { description: "...", features: ["..."] }
+
+  } catch (error) {
+    console.error("Kesalahan Analisis AI:", error);
+    // Jika AI gagal, kembalikan null agar kita bisa lanjut tanpa AI
+    return null;
+  }
+}
+
+// --- Handler Utama Serverless Function (Versi 4) ---
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metode tidak diizinkan' });
@@ -44,69 +88,102 @@ export default async function handler(req, res) {
 
     const { owner, repo } = parseRepoUrl(repoUrl);
 
-    // Siapkan header autentikasi
+    // Siapkan header autentikasi GitHub
     const headers = {
       'Authorization': `token ${process.env.GITHUB_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json',
     };
 
-    // --- Eksekusi 3 Panggilan API secara Paralel ---
-    const [repoRes, pkgRes, envRes] = await Promise.all([
-      // 1. Ambil info repo dasar
+    // --- Eksekusi Panggilan API Paralel (termasuk file kode) ---
+    const [repoRes, pkgRes, envRes, codeRes] = await Promise.all([
       fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
-      
-      // 2. Ambil package.json
       fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`, { headers }),
-      
-      // 3. Cek keberadaan .env.example
-      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/.env.example`, { method: 'HEAD', headers })
+      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/.env.example`, { method: 'HEAD', headers }),
+      // Mencoba mengambil file kode utama (ASUMSI)
+      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/src/App.jsx`, { headers })
     ]);
 
     // --- Proses Hasil 1: Info Repo ---
     if (!repoRes.ok) throw new Error('Repositori tidak ditemukan atau GITHUB_TOKEN bermasalah.');
     const repoData = await repoRes.json();
-    
     const projectTitle = repoData.name || 'Nama Proyek';
-    const description = repoData.description || '(Belum ada deskripsi untuk repositori ini.)';
+    let description = repoData.description; // Deskripsi GitHub (mungkin kosong)
     const language = repoData.language || 'Tidak terdeteksi';
     const topics = repoData.topics || [];
 
     // --- Proses Hasil 2: package.json ---
     let installCmd = '(Tidak ada package.json)';
     let usageCmd = '(Tidak ada package.json)';
+    let pkgJson = {};
 
     if (pkgRes.ok) {
       const pkgData = await pkgRes.json();
       const fileContent = Buffer.from(pkgData.content, 'base64').toString('utf-8');
-      const pkgJson = JSON.parse(fileContent);
+      pkgJson = JSON.parse(fileContent);
       const analysis = analyzePackageJson(pkgJson);
       installCmd = analysis.installCmd;
       usageCmd = analysis.usageCmd;
     }
-
+    
+    // --- Logika Deskripsi Fallback (sebelum AI) ---
+    if (!description && pkgJson.description) {
+      description = pkgJson.description; // Fallback ke deskripsi package.json
+    } else if (!description) {
+      description = '(Belum ada deskripsi untuk repositori ini.)';
+    }
+    
     // --- Proses Hasil 3: .env.example ---
-    // Jika 'envRes.ok' (status 200), berarti file ditemukan
     const envExists = envRes.ok;
 
-    // --- Rakit String Markdown Sesuai Template Baru ---
+    // --- Proses Hasil 4: Analisis AI ---
+    let aiDescription = null;
+    let aiFeatures = [];
+
+    if (codeRes.ok) {
+      const codeData = await codeRes.json();
+      const codeContent = Buffer.from(codeData.content, 'base64').toString('utf-8');
+      
+      // Panggil fungsi AI baru kita
+      const aiAnalysis = await analyzeCodeWithAI(codeContent);
+      
+      if (aiAnalysis) {
+        aiDescription = aiAnalysis.description;
+        aiFeatures = aiAnalysis.features;
+      }
+    }
+
+    // --- Rakit String Markdown (Menggunakan Data AI) ---
     
+    // Prioritas Deskripsi: 1. AI, 2. GitHub, 3. package.json, 4. Fallback
+    const finalDescription = aiDescription || description;
+
     let md = `
 # ${projectTitle}
 
-${description}
+${finalDescription}
 
 ## Fitur
+`;
+
+    // Gunakan fitur dari AI jika ada, jika tidak, gunakan placeholder
+    if (aiFeatures.length > 0) {
+      md += aiFeatures.map(feature => `- ${feature}`).join('\n');
+    } else {
+      md += `
 - Fitur A
 - Fitur B
 - Fitur C
+`;
+    }
 
+    md += `
 ## Requirement
 `;
 
     if (envExists) {
       md += `
 Proyek ini membutuhkan konfigurasi *environment variables*. 
-Salin file \`.env.example\` menjadi \`.env\` dan isi variabel yang diperlukan sebelum menjalankan proyek.
+Salin file \`.env.example\` menjadi \`.env\` dan isi variabel yang diperlukan.
 \`\`\`bash
 cp .env.example .env
 \`\`\`
@@ -131,7 +208,6 @@ ${installCmd}
 \`\`\`
 
 ## Penggunaan
-(Saya tambahkan bagian ini karena sangat penting dan didapat dari \`package.json\`)
 \`\`\`bash
 ${usageCmd}
 \`\`\`
@@ -152,7 +228,7 @@ ${usageCmd}
     res.status(200).json({ markdown: md.trim() });
 
   } catch (error) {
-    console.error(error);
+    console.error("Kesalahan Handler Utama:", error.message);
     res.status(500).json({ message: error.message });
   }
 }
