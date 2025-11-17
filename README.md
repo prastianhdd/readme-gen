@@ -1,16 +1,45 @@
-# React + Vite
+# 🤖 README.md Generator (readme-gen)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sebuah tool cerdas yang menggunakan AI (Google Gemini) untuk menganalisis repositori GitHub Anda dan secara otomatis membuat draf README.md yang profesional dan siap pakai.
 
-Currently, two official plugins are available:
+Cukup tempel URL repositori, dan biarkan AI menganalisis kode Anda untuk membuat deskripsi dan daftar fitur secara otomatis.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Fitur
+- Input formulir untuk memasukkan URL repositori GitHub.
+- Fungsi untuk memicu generasi README.md otomatis melalui panggilan API.
+- Indikator status loading dan penanganan kesalahan untuk umpan balik pengguna.
+- Area teks untuk menampilkan dan menyalin output Markdown yang dihasilkan.
 
-## React Compiler
+## Requirement
+- GITHUB_TOKEN
+- GEMINI_API_KEY
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Instalasi
+```bash
+# 1. Clone repositori
+git clone https://github.com/prastianhdd/readme-gen.git
 
-## Expanding the ESLint configuration
+# 2. Masuk ke direktori
+cd readme-gen
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+# 3. Install dependencies
+npm install
+```
+
+## Penggunaan
+```bash
+npm run dev
+```
+
+## Teknologi yang di gunakan
+- Frontend: React (Vite)
+- Backend: Vercel Serverless Functions (Node.js)
+- Styling: CSS Murni (Desain Claymorphism)
+- Analisis AI: Google Gemini AI (@google/generative-ai)
+- Pengambilan Data: GitHub API
+- Platform: Vercel (untuk hosting frontend dan backend serverless)
+
+---
+<p align="center">
+  <i>✨ Dibuat secara otomatis oleh README.md Generator ✨</i>
+</p>
