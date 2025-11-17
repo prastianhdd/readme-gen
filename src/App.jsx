@@ -52,17 +52,17 @@ function App() {
       {/* Bagian Atas: Form Input */}
       <div className="form-section" style={{ width: '100%' }}>
         <h2>Generator README.md Otomatis</h2>
-        <p>Paste link repositori GitHub publik dan biarkan kami menganalisisnya.</p>
 
         <div className="form-group">
           <label htmlFor="repo-url">Link Repositori GitHub:</label>
+          <p p></p>
           <input
             type="text"
             id="repo-url"
             className="input-field"
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
-            placeholder="https://github.com/facebook/react"
+            placeholder="https://github.com/prastianhdd/profile"
           />
         </div>
         
@@ -85,7 +85,7 @@ function App() {
           style={{ height: '400px' }} // Sesuaikan tinggi
           value={markdownOutput}
           readOnly
-          placeholder="Hasil Markdown akan muncul di sini..."
+          placeholder="Hasil readme md ..."
         />
       </div>
       

@@ -1,71 +1,137 @@
+/* 1. Style Container Utama (sebagai "Clay Card")
+*/
 .container {
-  max-width: 1000px;
-  margin: 20px auto; /* Posisi di tengah */
-  padding: 20px;
-  display: flex;
-  flex-wrap: wrap; /* Agar responsif di layar kecil */
-  gap: 30px; /* Jarak antara kolom form dan output */
-  background-color: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 32px; /* Padding lebih besar (sesuai brief 24-32px) */
+  gap: 30px;
+  
+  /* Menerapkan style Claymorphism Card */
+  background-color: var(--bg-surface);
+  border-radius: 24px; /* Sudut sangat bulat (sesuai brief 20-24px) */
+  
+  /* Dual Shadow System (Inti Claymorphism) */
+  box-shadow: 
+    0 8px 20px var(--shadow-color-dark), /* Outer shadow (bawah, gelap) */
+    inset 0 2px 4px var(--shadow-color-light); /* Inner highlight (atas, terang) */
+    
+  /* Menghapus style Neobrutalism */
+  border: none;
 }
 
-/* Kedua bagian (form dan output) */
+/* 2. Style Form
+*/
 .form-section,
 .output-section {
-  flex: 1; /* Membuat kedua bagian sama lebar */
-  min-width: 300px; /* Lebar minimum sebelum "wrap" */
+  flex: 1;
+  min-width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* Jarak antar item form */
+  gap: 20px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-}
-
+/* Style Label (lembut) */
 .form-group label {
-  font-weight: bold;
-  margin-bottom: 5px;
-  color: #555;
+  font-weight: 500; /* Medium */
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 8px;
+  color: var(--text-secondary); /* Warna teks lebih lembut */
 }
 
-/* Styling untuk input dan textarea kecil */
+/* 3. Style Input & Textarea (Efek "Pressed-in")
+*/
 .input-field,
-.textarea-small {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.textarea-small {
-  height: 100px;
-  resize: vertical; /* Izinkan user mengubah tinggi textarea */
-}
-
-/* Textarea khusus untuk output Markdown */
 .output-textarea {
   width: 100%;
-  height: 500px; /* Lebih tinggi untuk menampilkan README */
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 14px;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #fdfdfd;
-  resize: vertical;
-  color: #333;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+  
+  /* Menerapkan style Claymorphism Input */
+  background-color: var(--bg-main); /* Warna bg sama dengan body, terlihat "ditekan" */
+  border-radius: 16px; /* Sudut bulat (sesuai brief 12-16px) */
+  border: none; /* Tanpa border */
+  
+  /* Shadow untuk input: "inset" (tertekan) */
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
-/* Memberi fokus visual pada input */
+/* Style :focus (sesuai brief) */
 .input-field:focus,
-.textarea-small:focus,
 .output-textarea:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0,123,255,.25);
+  /* Tambahkan focus ring yang lembut */
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.06),
+    0 0 0 3px var(--accent-focus);
+}
+
+/* Khusus untuk Textarea Output */
+.output-textarea {
+  height: 400px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  resize: vertical;
+}
+
+/* 4. Style Tombol "Generate" (sebagai "Clay Button")
+*/
+button {
+  background-color: var(--accent-primary);
+  color: var(--text-primary);
+  padding: 12px 24px;
+  
+  /* Menerapkan style Claymorphism Button */
+  border: none;
+  border-radius: 20px; /* Sudut bulat (sesuai brief 16-20px) */
+  
+  /* Dual Shadow System (sedikit lebih kecil untuk tombol) */
+  box-shadow: 
+    0 6px 16px var(--shadow-color-dark),
+    inset 0 2px 4px var(--highlight-color);
+  
+  /* Menerapkan style Typography */
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 500; /* Medium */
+  text-transform: none;
+  letter-spacing: normal;
+  
+  cursor: pointer;
+}
+
+/* Style :hover (sesuai brief: "slight shadow increase") */
+button:hover {
+  transform: translateY(-2px); /* Sedikit terangkat */
+  box-shadow: 
+    0 10px 22px var(--shadow-color-dark),
+    inset 0 2px 4px var(--highlight-color);
+}
+
+/* Style :active (efek tertekan) */
+button:active {
+  transform: translateY(1px);
+  box-shadow: 
+    0 3px 10px var(--shadow-color-dark),
+    inset 0 2px 4px var(--highlight-color);
+}
+
+/* Style :disabled */
+button:disabled {
+  background-color: #E0E0E0;
+  color: var(--text-secondary);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+/* 5. Perbaikan Spasi (dari request sebelumnya)
+*/
+.form-section > button {
+  margin-bottom: 30px;
+}
+.output-section h2 {
+    margin-top: 0; /* Reset margin top karena sudah ada gap dari container */
 }

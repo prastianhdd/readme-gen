@@ -1,8 +1,8 @@
-// Helper untuk mem-parsing URL GitHub
+// Helper (masih sama)
 function parseRepoUrl(url) {
   try {
     const { pathname } = new URL(url);
-    const parts = pathname.split('/').filter(Boolean); // Hapus spasi kosong
+    const parts = pathname.split('/').filter(Boolean);
     if (parts.length < 2) throw new Error('URL tidak valid');
     return { owner: parts[0], repo: parts[1] };
   } catch (error) {
@@ -10,21 +10,28 @@ function parseRepoUrl(url) {
   }
 }
 
-// Helper untuk menganalisis package.json
+// Helper (masih sama, versi 2)
 function analyzePackageJson(pkgJson) {
   const scripts = pkgJson.scripts || {};
-  
-  // Logika cerdas untuk menentukan perintah
-  // (Bisa dikembangkan lebih lanjut)
-  const installCmd = (pkgJson.dependencies || pkgJson.devDependencies) ? 'npm install' : 'Tidak ada dependensi yang perlu diinstal.';
-  const usageCmd = scripts.dev || scripts.start || 'Silakan periksa script package.json untuk perintah penggunaan.';
+  let installCmd = 'npm install';
+  let usageCmd = 'Tidak ada skrip `dev` atau `start` yang ditemukan.';
+
+  if (scripts.dev) usageCmd = 'npm run dev';
+  else if (scripts.start) usageCmd = 'npm run start';
+
+  if (pkgJson.packageManager && pkgJson.packageManager.startsWith('yarn')) {
+    installCmd = 'yarn install';
+    usageCmd = usageCmd.replace('npm run', 'yarn');
+  } else if (pkgJson.packageManager && pkgJson.packageManager.startsWith('pnpm')) {
+    installCmd = 'pnpm install';
+    usageCmd = usageCmd.replace('npm run', 'pnpm');
+  }
 
   return { installCmd, usageCmd };
 }
 
-// Handler utama Serverless Function
+// --- Handler Utama Serverless Function (Versi 3) ---
 export default async function handler(req, res) {
-  // Hanya izinkan metode POST
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Metode tidak diizinkan' });
   }
@@ -37,68 +44,115 @@ export default async function handler(req, res) {
 
     const { owner, repo } = parseRepoUrl(repoUrl);
 
-    // Header untuk autentikasi GitHub API (SANGAT PENTING untuk menghindari rate limit)
-    // Anda harus membuat GITHUB_TOKEN di Akun GitHub Anda dan menambahkannya ke Vercel Environment Variables
+    // Siapkan header autentikasi
     const headers = {
       'Authorization': `token ${process.env.GITHUB_TOKEN}`,
       'Accept': 'application/vnd.github.v3+json',
     };
 
-    // --- Panggilan API 1: Dapatkan Info Dasar Repositori ---
-    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
-    if (!repoRes.ok) throw new Error('Repositori tidak ditemukan.');
+    // --- Eksekusi 3 Panggilan API secara Paralel ---
+    const [repoRes, pkgRes, envRes] = await Promise.all([
+      // 1. Ambil info repo dasar
+      fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers }),
+      
+      // 2. Ambil package.json
+      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`, { headers }),
+      
+      // 3. Cek keberadaan .env.example
+      fetch(`https://api.github.com/repos/${owner}/${repo}/contents/.env.example`, { method: 'HEAD', headers })
+    ]);
+
+    // --- Proses Hasil 1: Info Repo ---
+    if (!repoRes.ok) throw new Error('Repositori tidak ditemukan atau GITHUB_TOKEN bermasalah.');
     const repoData = await repoRes.json();
-
+    
     const projectTitle = repoData.name || 'Nama Proyek';
-    const description = repoData.description || 'Tidak ada deskripsi.';
+    const description = repoData.description || '(Belum ada deskripsi untuk repositori ini.)';
+    const language = repoData.language || 'Tidak terdeteksi';
+    const topics = repoData.topics || [];
 
-    // --- Panggilan API 2: Dapatkan file package.json ---
-    let installCmd = 'npm install'; // Default
-    let usageCmd = 'npm run dev'; // Default
+    // --- Proses Hasil 2: package.json ---
+    let installCmd = '(Tidak ada package.json)';
+    let usageCmd = '(Tidak ada package.json)';
 
-    try {
-      const pkgRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`, { headers });
-      if (pkgRes.ok) {
-        const pkgData = await pkgRes.json();
-        // Konten file dari GitHub API di-encode dalam Base64
-        const fileContent = Buffer.from(pkgData.content, 'base64').toString('utf-8');
-        const pkgJson = JSON.parse(fileContent);
-        
-        // Analisis file package.json
-        const analysis = analyzePackageJson(pkgJson);
-        installCmd = analysis.installCmd;
-        usageCmd = analysis.usageCmd;
-      }
-    } catch (pkgError) {
-      // Abaikan jika package.json tidak ada, gunakan default
-      console.warn('Tidak dapat menemukan atau mem-parsing package.json:', pkgError.message);
+    if (pkgRes.ok) {
+      const pkgData = await pkgRes.json();
+      const fileContent = Buffer.from(pkgData.content, 'base64').toString('utf-8');
+      const pkgJson = JSON.parse(fileContent);
+      const analysis = analyzePackageJson(pkgJson);
+      installCmd = analysis.installCmd;
+      usageCmd = analysis.usageCmd;
     }
 
-    // --- Rakit String Markdown ---
-    const generatedMarkdown = `
+    // --- Proses Hasil 3: .env.example ---
+    // Jika 'envRes.ok' (status 200), berarti file ditemukan
+    const envExists = envRes.ok;
+
+    // --- Rakit String Markdown Sesuai Template Baru ---
+    
+    let md = `
 # ${projectTitle}
 
-## 📝 Deskripsi
 ${description}
 
-## 🚀 Instalasi
+## Fitur
+- Fitur A
+- Fitur B
+- Fitur C
+
+## Requirement
+`;
+
+    if (envExists) {
+      md += `
+Proyek ini membutuhkan konfigurasi *environment variables*. 
+Salin file \`.env.example\` menjadi \`.env\` dan isi variabel yang diperlukan sebelum menjalankan proyek.
 \`\`\`bash
+cp .env.example .env
+\`\`\`
+`;
+    } else {
+      md += `
+Tidak ada *requirement* atau konfigurasi \`.env\` khusus yang terdeteksi.
+`;
+    }
+
+    md += `
+## Instalasi
+\`\`\`bash
+# 1. Clone repositori
+git clone ${repoData.clone_url}
+
+# 2. Masuk ke direktori
+cd ${projectTitle}
+
+# 3. Install dependencies
 ${installCmd}
 \`\`\`
 
-## 💻 Penggunaan
+## Penggunaan
+(Saya tambahkan bagian ini karena sangat penting dan didapat dari \`package.json\`)
 \`\`\`bash
 ${usageCmd}
 \`\`\`
 
-## 📄 Lisensi
-Proyek ini dilisensikan di bawah Lisensi ${repoData.license ? repoData.license.name : 'MIT'}.
+## Teknologi yang di gunakan
+- **Bahasa Utama:** ${language}
+- **Topik Terkait:** ${topics.length > 0 ? topics.map(t => `\`${t}\``).join(', ') : 'Tidak ada topik'}
+`;
+
+    md += `
+---
+<p align="center">
+  <i>✨ Dibuat secara otomatis oleh README.md Generator ✨</i>
+</p>
     `;
 
     // Kirim hasil akhir kembali ke frontend
-    res.status(200).json({ markdown: generatedMarkdown.trim() });
+    res.status(200).json({ markdown: md.trim() });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 }
